@@ -98,6 +98,6 @@ int main(int argc, char * argv[]){
 
     closedir(dir);
     free(_stat);
-
+    free(_time);
     return EXIT_SUCCESS;
 }
