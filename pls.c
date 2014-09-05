@@ -11,6 +11,7 @@
 #include <locale.h>
 
 static char permBuffer[30];
+char pathname[MAXPATHLEN];
 
 //
 // Name: getPermissions
@@ -44,6 +45,12 @@ const char *getPermissions(mode_t mode){
     return (const char*)permBuffer;
 }
 
+// define fcn pointer for scandir function call
+//
+static int one(const struct dirent *unused){
+    return 1;
+}
+
 // 
 // Name: kill
 //
@@ -57,8 +64,10 @@ void kill(char *message){
 
 int main(int argc, char * argv[]){
 
-    DIR * dir;
-    struct dirent *_file;
+    int count = 0, i;
+    DIR * dir = NULL;
+    //struct dirent *_file = NULL;
+    struct dirent **_files;
     struct stat *_stat;
     struct group _grp;
     struct group *_grpres;
@@ -69,35 +78,43 @@ int main(int argc, char * argv[]){
     // call opendir on whatever is passed in (i.e. file or directory)
     // we have no idea at the moment
     //
-    dir = opendir(argv[1]);
+    // dir = opendir(argv[1]);
     _stat = (struct stat *)malloc(sizeof(struct stat));
     _time = (struct tm *)malloc(sizeof(struct tm));
-    
-    while((_file = readdir(dir)) != NULL){
-       if( stat(_file->d_name, _stat) == 0){
-           // Print out type, permissions, and number of links
-           printf("%10.10s", getPermissions(_stat->st_mode));
-           printf(" %d", _stat->st_nlink);
+
+    // scan the given path and sort the contents into 'files' in alphabetical order
+    //
+    count = scandir(argv[1], &_files, one, alphasort);
+
+    if(count > 0){
+        for( i = 0; i < count; ++i){
+            if( stat(_files[i]->d_name, _stat) == 0){
+                // Print out type, permissions, and number of links
+                printf("%10.10s", getPermissions(_stat->st_mode));
+                printf(" %d", _stat->st_nlink);
          
-           if(!getgrgid_r(_stat->st_gid, &_grp, buffer, sizeof(buffer), &_grpres))
-               printf(" %s", _grp.gr_name);
-           else
-               printf(" %d", _stat->st_gid);
+               if(!getgrgid_r(_stat->st_gid, &_grp, buffer, sizeof(buffer), &_grpres))
+                   printf(" %s", _grp.gr_name);
+               else
+                   printf(" %d", _stat->st_gid);
            
-           // print size of file
-           printf(" %5d", (int)_stat->st_size);
+               // print size of file
+               printf(" %5d", (int)_stat->st_size);
 
-           // gets broken-down local time (timezone is handled)
-           localtime_r(&_stat->st_mtime, _time);
+               // gets broken-down local time (timezone is handled)
+               localtime_r(&_stat->st_mtime, _time);
 
-           // convert date and time to a string
-           strftime(dateString, sizeof(dateString), "%F %T", _time);
-           printf(" %s %s\n", dateString, _file->d_name); 
-       }
+               // convert date and time to a string
+               strftime(dateString, sizeof(dateString), "%F %T", _time);
+               printf(" %s %s\n", dateString, _files[i]->d_name); 
+           }
+           free(_files[i]);
+        }
+        free(_files);
     }
-
     closedir(dir);
     free(_stat);
     free(_time);
+
     return EXIT_SUCCESS;
 }
